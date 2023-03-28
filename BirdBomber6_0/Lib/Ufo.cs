@@ -33,11 +33,11 @@ namespace BirdBomber.Lib
         public override void Update(GameTime gameTime)
         {
             Position.X += Speed;
-            if ((Speed>0 && Position.X > game.GraphicsDevice.Viewport.Width + 50)|(Speed > 0 && Position.X < game.GraphicsDevice.Viewport.Width -1000))
+            if ((Speed > 0 && Position.X > game.GraphicsDevice.Viewport.Width + 50) | (Speed > 0 && Position.X < game.GraphicsDevice.Viewport.Width - 1000))
             {
                 this.IsActive = false;
             }
-            base.Update(gameTime);
+            //base.Update(gameTime);
         }
     }
 }

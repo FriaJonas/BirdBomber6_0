@@ -24,7 +24,7 @@ namespace BirdBomber.Lib
             else
                 IsActive = false;
 
-            base.Update(gameTime);
+            //base.Update(gameTime);
         }
     }
 }

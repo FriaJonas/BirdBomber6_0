@@ -1,4 +1,5 @@
 ﻿using BirdBomber.Lib;
+using BirdBomber6_0.Lib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
@@ -7,19 +8,25 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 
 namespace BirdBomber
 {
     public enum GameState
     {
-        Paus,
+        Start,
         InGame,
-        Error
+        GameOver
     }
     public class BirdBomber : Game
     {
+        private List<HighScore> HighScores { get; set; } = new List<HighScore>();
+        private bool GotHighScore { get;set; }=false;
+
         private string test = "";
-        private GameState ActiveState = GameState.Paus;
+        private GameState ActiveState = GameState.Start;
 
         private GraphicsDeviceManager graphics;
         private SpriteBatch spriteBatch;
@@ -39,7 +46,7 @@ namespace BirdBomber
         Texture2D BackgroundEnd;
 
         //Hur ofta man får skjuta - tiden mellan skotten
-        int Shot_delay = 300;
+        int Shot_delay = 150;
         int Shot_time;
 
         //Hur ofta bomberna ska falla
@@ -59,18 +66,17 @@ namespace BirdBomber
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
+            HighScores= LoadHighScore();
         }
 
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
-            fighter = new Fighter(this)
-            {
-                Position = new Vector2(graphics.GraphicsDevice.Viewport.Width / 2 - 20, graphics.GraphicsDevice.Viewport.Height - 60),
-                Speed = 5,
-            };
-            graphics.PreferredBackBufferWidth = 800;// GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width;
-            graphics.PreferredBackBufferHeight = 550; //GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height;
+            fighter = new Fighter(this);
+            //graphics.IsFullScreen = true;
+            Window.AllowUserResizing = true;
+            graphics.PreferredBackBufferWidth =  GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width;
+            graphics.PreferredBackBufferHeight = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height;
             graphics.ApplyChanges();
             base.Initialize();
 
@@ -110,7 +116,7 @@ namespace BirdBomber
                 {
                     Ufo_time = Ufo_delay;
                     ufo = new Ufo(this);
-                    Shot_delay = 800; // Vi gör skjut-tiden långsammare när det kommer ett nytt ufo!
+                    Shot_delay = 600; // Vi gör skjut-tiden långsammare när det kommer ett nytt ufo!
                 }
                 if (ufo != null)
                 {
@@ -210,22 +216,33 @@ namespace BirdBomber
                             explosionSound.Play(0.05f, 0f, 0f);
                             ufo.IsActive = false;
                             s.IsActive = false;
-                            Shot_delay = 150; //Lite bonus vid träff - skjuta oftare
+                            Shot_delay = 50; //Lite bonus vid träff - skjuta oftare
                         }
                     }
                 }
                 if (Life == 0)
                 {
                     //Om liven tagit slut
-                    ActiveState = GameState.Paus;
+                    ActiveState = GameState.GameOver;
+                    HighScore  newHs = new HighScore()
+                    {
+                        Score = Points,
+                        Nickname = "test",
+                        TimePlayed = DateTime.Now
+                    };
+                    SaveScore(newHs);
                 }
             }
-            else if (ActiveState == GameState.Paus)
+            else if (ActiveState == GameState.GameOver | ActiveState == GameState.Start)
             {
                 //Om spelet inte är aktiverat
                 if (ks.IsKeyDown(Keys.Enter))
                 {
+                    GotHighScore = false;
                     Life = 3; Points = 0;
+                    bombs.Clear();
+                    shots.Clear();
+                    fighter.Restore();
                     ActiveState = GameState.InGame;
                     //Vi behöver ju även göra en reset på alla bomber och var fightern är när vi startar om
                 }
@@ -239,24 +256,30 @@ namespace BirdBomber
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
             spriteBatch.Begin();
-            if (ActiveState == GameState.Paus)
+            if (ActiveState == GameState.Start)
             {
-                spriteBatch.Draw(BackgroundEnd, new Vector2(0, 0), Color.White);
+                spriteBatch.Draw(BackgroundEnd, GraphicsDevice.Viewport.Bounds, Color.White);
                 //Om spelet inte är aktivt
-                if (Life > 0)
+                spriteBatch.DrawString(Font, "PRESS ENTER TO START", new Vector2(250, 250), Color.White);
+                DrawHigScore();
+            }
+            else if(ActiveState== GameState.GameOver)
+            {
+                spriteBatch.Draw(BackgroundEnd, GraphicsDevice.Viewport.Bounds, Color.White);
+                //Kolla Highscore
+                
+                if (GotHighScore)
                 {
-                    spriteBatch.DrawString(Font, "PRESS ENTER TO START", new Vector2(250, 250), Color.White);
-                }
-                else
-                {
-                    spriteBatch.DrawString(Font, "GAME OVER - PRESS ENTER TO RESTART", new Vector2(250, 250), Color.White);
+                    spriteBatch.DrawString(Font, "GRATULATION TO HIGHSCORE", new Vector2(GraphicsDevice.Viewport.Bounds.Width/3, 150), Color.White);
                 }
 
+                spriteBatch.DrawString(Font, "GAME OVER - PRESS ENTER TO RESTART", new Vector2(GraphicsDevice.Viewport.Bounds.Width / 3, 200), Color.White);
+                DrawHigScore();
             }
             else if (ActiveState == GameState.InGame)
             {
-                spriteBatch.Draw(Background, new Vector2(0, 0), Color.White);
-
+                spriteBatch.Draw(Background, GraphicsDevice.Viewport.Bounds, Color.White);
+                
                 //Uppdatera fightern
                 fighter.Draw(spriteBatch);
 
@@ -289,6 +312,69 @@ namespace BirdBomber
             spriteBatch.End();
 
             base.Draw(gameTime);
+        }
+
+        private void SaveScore(HighScore newScore)
+        {
+            //Vi lägger till scoren
+            int minScore = 0;
+            int maxScore = 0;
+            if (HighScores.Count > 0)
+            {
+                minScore = HighScores.Min(x => x.Score);
+                maxScore = HighScores.Max(x => x.Score);
+            }
+            if (newScore.Score > maxScore)
+            {
+                GotHighScore = true;
+            }
+            //om scoren är högre än lägsta i listan eller att det inte finns 5st.
+            if(newScore.Score> minScore | HighScores.Count<5)
+            {
+                HighScores.Add(newScore);
+                HighScores.Sort(delegate (HighScore x, HighScore y)
+                {
+                    return y.Score.CompareTo(x.Score);
+                });
+                //Plocka ut de fem högsta
+                HighScores = HighScores.Take(5).ToList();
+
+                string serializedText = JsonSerializer.Serialize<List<HighScore>>(HighScores);
+
+                File.WriteAllText("HighScore.json", serializedText);
+            }
+        }
+        private List<HighScore> LoadHighScore()
+        {
+            try
+            {
+                var content = File.ReadAllText("HighScore.json");
+                var lista =  JsonSerializer.Deserialize<List<HighScore>>(content);
+                return lista;
+            }
+            catch
+            {
+               return new List<HighScore>();
+                        
+            }
+        }
+        private void DrawHigScore()
+        {
+            //Skriva ut Hiscore TOP 10
+            if(HighScores.Count > 0)
+            {
+                float y = 300;
+                spriteBatch.DrawString(Font, "High scores Top 5: ", new Vector2(250, y), Color.White);
+                
+                foreach(var hs in HighScores)
+                {
+                    y += 30;
+                    spriteBatch.DrawString(Font,hs.TimePlayed.ToShortDateString()+" "+ hs.Nickname+" " +hs.Score, new Vector2(250, y), Color.White);
+                    
+                }
+                
+            }
+
         }
     }
 }

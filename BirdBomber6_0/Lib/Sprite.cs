@@ -26,10 +26,8 @@ namespace BirdBomber.Lib
                 return new Rectangle((int)Position.X, (int)Position.Y, Texture.Width, Texture.Height);
             }
         }
-        public virtual void Update(GameTime gameTime) 
-        {
-
-        }
+        public abstract void Update(GameTime gameTime);
+        
 
         public  void Draw(SpriteBatch spriteBatch) {
             spriteBatch.Draw(Texture, Position, Color);        

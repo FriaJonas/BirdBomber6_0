@@ -20,7 +20,7 @@ namespace BirdBomber.Lib
         {
             Position.Y += Speed;
             if (Position.Y < 0) this.IsActive = false;
-            base.Update(gameTime);
+           
         }
 
     }

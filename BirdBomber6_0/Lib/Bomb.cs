@@ -26,7 +26,7 @@ namespace BirdBomber.Lib
             Position.Y += Speed;
             //Om bomberna faller förbi
             if (Position.Y > game.GraphicsDevice.Viewport.Height+20) this.IsActive = false;
-            base.Update(gameTime);
+            //base.Update(gameTime);
         }
 
     }

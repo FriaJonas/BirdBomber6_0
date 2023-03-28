@@ -10,12 +10,17 @@ namespace BirdBomber.Lib
     {
         public Fighter(Game game):base(game) {
             Texture = game.Content.Load<Texture2D>("ship");
+            Restore();
         }
-
+        public void Restore()
+        {
+            Position = new Vector2(game.GraphicsDevice.Viewport.Width / 2 - 20, game.GraphicsDevice.Viewport.Height - 90);
+            Speed = 5;
+        }
         public override void Update(GameTime gameTime)
         {
             CheckKeyPress();
-            base.Update(gameTime);
+            //base.Update(gameTime);
         }
         private void CheckKeyPress()
         {
@@ -28,7 +33,7 @@ namespace BirdBomber.Lib
             {
                 Position.X += Speed;
             }
-            if (ks.IsKeyDown(Keys.Down) && Position.Y<500)
+            if (ks.IsKeyDown(Keys.Down) && Position.Y< game.GraphicsDevice.Viewport.Height-90)
             {
                 Position.Y += Speed;
             }
