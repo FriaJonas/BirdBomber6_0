@@ -12,5 +12,7 @@ namespace BirdBomber6_0.Lib
         public int Score { get; set; }
         public DateTime TimePlayed { get; set; }
 
+
+
     }
 }

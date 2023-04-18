@@ -10,6 +10,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 
 namespace BirdBomber
@@ -22,6 +23,9 @@ namespace BirdBomber
     }
     public class BirdBomber : Game
     {
+        public static GameWindow gw;
+        public static MouseState mouseState;
+        bool myBoxHasFocus = true;
         private List<HighScore> HighScores { get; set; } = new List<HighScore>();
         private bool GotHighScore { get;set; }=false;
 
@@ -44,6 +48,8 @@ namespace BirdBomber
 
         Texture2D Background;
         Texture2D BackgroundEnd;
+        Texture2D TextBox;
+        Rectangle TextBoxRectangle;
 
         //Hur ofta man får skjuta - tiden mellan skotten
         int Shot_delay = 150;
@@ -60,6 +66,7 @@ namespace BirdBomber
         //Ljud
         SoundEffect laserSound;
         SoundEffect explosionSound;
+        StringBuilder playerName = new StringBuilder();
 
         public BirdBomber()
         {
@@ -67,8 +74,46 @@ namespace BirdBomber
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
             HighScores= LoadHighScore();
-        }
 
+            gw = Window;
+          
+        }
+        public void OnInput(object sender, TextInputEventArgs e)
+        {
+            var k = e.Key;
+            int ch = (int)e.Character;
+            if(e.Key== Keys.Back)
+            {
+                playerName.Remove(playerName.Length - 1, 1);
+            }
+            else if((ch==32 | (ch >= 97 && ch <= 122) |( ch >= 65 && ch <= 90)) && playerName.Length<15)
+            {
+                
+                var c = e.Character;
+                playerName.Append(c);
+            }
+
+            Console.WriteLine(playerName);
+        }
+        public static void RegisterFocusedButtonForTextInput(System.EventHandler<TextInputEventArgs> method)
+        {
+            gw.TextInput += method;
+        }
+        public static void UnRegisterFocusedButtonForTextInput(System.EventHandler<TextInputEventArgs> method)
+        {
+            gw.TextInput -= method;
+        }
+        public void CheckClickOnMyBox(Point mouseClick, bool isClicked, Rectangle r)
+        {
+            if (r.Contains(mouseClick) && isClicked)
+            {
+                myBoxHasFocus = !myBoxHasFocus;
+                if (myBoxHasFocus)
+                    RegisterFocusedButtonForTextInput(OnInput);
+                else
+                    UnRegisterFocusedButtonForTextInput(OnInput);
+            }
+        }
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
@@ -87,7 +132,8 @@ namespace BirdBomber
             spriteBatch = new SpriteBatch(GraphicsDevice);
             Background = Content.Load<Texture2D>("bgspace");
             BackgroundEnd = Content.Load<Texture2D>("bgdeath");
-
+            TextBox = Content.Load<Texture2D>("TextBox");
+            TextBoxRectangle = new Rectangle(100,350,TextBox.Width,TextBox.Height);
             laserSound = Content.Load<SoundEffect>("laserSound");
             explosionSound = Content.Load<SoundEffect>("explosionSound");
             Font = Content.Load<SpriteFont>("Text");
@@ -102,6 +148,7 @@ namespace BirdBomber
             //Avslutar spelet om vi klickar Esc
             if (Keyboard.GetState().IsKeyDown(Keys.Escape)) Exit();
 
+            
             //Lyssnar av tangentbordet
             KeyboardState ks = Keyboard.GetState();
 
@@ -235,6 +282,7 @@ namespace BirdBomber
             }
             else if (ActiveState == GameState.GameOver | ActiveState == GameState.Start)
             {
+                mouseState = Mouse.GetState();
                 //Om spelet inte är aktiverat
                 if (ks.IsKeyDown(Keys.Enter))
                 {
@@ -246,6 +294,12 @@ namespace BirdBomber
                     ActiveState = GameState.InGame;
                     //Vi behöver ju även göra en reset på alla bomber och var fightern är när vi startar om
                 }
+                if(ActiveState == GameState.GameOver)
+                {
+                    var isClicked = mouseState.LeftButton == ButtonState.Pressed;
+                    CheckClickOnMyBox(mouseState.Position, isClicked, TextBoxRectangle);
+                }
+
             }
             else { }
 
@@ -271,6 +325,8 @@ namespace BirdBomber
                 if (GotHighScore)
                 {
                     spriteBatch.DrawString(Font, "GRATULATION TO HIGHSCORE", new Vector2(GraphicsDevice.Viewport.Bounds.Width/3, 150), Color.White);
+                    spriteBatch.Draw(TextBox, TextBoxRectangle, Color.White);
+                    spriteBatch.DrawString(Font, ""+playerName.ToString(), new Vector2((float)TextBoxRectangle.Left+40,(float)TextBoxRectangle.Top+40),Color.Black);
                 }
 
                 spriteBatch.DrawString(Font, "GAME OVER - PRESS ENTER TO RESTART", new Vector2(GraphicsDevice.Viewport.Bounds.Width / 3, 200), Color.White);
@@ -319,7 +375,7 @@ namespace BirdBomber
             //Vi lägger till scoren
             int minScore = 0;
             int maxScore = 0;
-            if (HighScores.Count > 0)
+             if (HighScores.Count > 0)
             {
                 minScore = HighScores.Min(x => x.Score);
                 maxScore = HighScores.Max(x => x.Score);
