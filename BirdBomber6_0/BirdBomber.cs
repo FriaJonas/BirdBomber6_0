@@ -25,11 +25,10 @@ namespace BirdBomber
     {
         public static GameWindow gw;
         public static MouseState mouseState;
-        bool myBoxHasFocus = true;
+        bool whaitForText = false;
         private List<HighScore> HighScores { get; set; } = new List<HighScore>();
         private bool GotHighScore { get;set; }=false;
 
-        private string test = "";
         private GameState ActiveState = GameState.Start;
 
         private GraphicsDeviceManager graphics;
@@ -39,7 +38,8 @@ namespace BirdBomber
         SpriteFont Font;
         int Life = 3;
         int Points = 0;
-
+        int minScore = 0;
+        int maxScore = 0;
         Fighter fighter { get; set; }
         List<Shot> shots { get; set; } = new List<Shot>();
         List<Bomb> bombs { get; set; } = new List<Bomb>();
@@ -74,7 +74,11 @@ namespace BirdBomber
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
             HighScores= LoadHighScore();
-
+            if (HighScores.Count > 0)
+            {
+                minScore = HighScores.Min(x => x.Score);
+                maxScore = HighScores.Max(x => x.Score);
+            }
             gw = Window;
           
         }
@@ -82,13 +86,12 @@ namespace BirdBomber
         {
             var k = e.Key;
             int ch = (int)e.Character;
-            if(e.Key== Keys.Back)
+            if(e.Key== Keys.Back&&playerName.Length>1)
             {
                 playerName.Remove(playerName.Length - 1, 1);
             }
             else if((ch==32 | (ch >= 97 && ch <= 122) |( ch >= 65 && ch <= 90)) && playerName.Length<15)
             {
-                
                 var c = e.Character;
                 playerName.Append(c);
             }
@@ -103,17 +106,17 @@ namespace BirdBomber
         {
             gw.TextInput -= method;
         }
-        public void CheckClickOnMyBox(Point mouseClick, bool isClicked, Rectangle r)
-        {
-            if (r.Contains(mouseClick) && isClicked)
-            {
-                myBoxHasFocus = !myBoxHasFocus;
-                if (myBoxHasFocus)
-                    RegisterFocusedButtonForTextInput(OnInput);
-                else
-                    UnRegisterFocusedButtonForTextInput(OnInput);
-            }
-        }
+        //public void CheckClickOnMyBox(Point mouseClick, bool isClicked, Rectangle r)
+        //{
+        //    if (r.Contains(mouseClick) && isClicked)
+        //    {
+        //        myBoxHasFocus = !myBoxHasFocus;
+        //        if (myBoxHasFocus)
+        //            RegisterFocusedButtonForTextInput(OnInput);
+        //        else
+        //            UnRegisterFocusedButtonForTextInput(OnInput);
+        //    }
+        //}
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
@@ -271,33 +274,42 @@ namespace BirdBomber
                 {
                     //Om liven tagit slut
                     ActiveState = GameState.GameOver;
-                    HighScore  newHs = new HighScore()
+                    if (Points > maxScore)
                     {
-                        Score = Points,
-                        Nickname = "test",
-                        TimePlayed = DateTime.Now
-                    };
-                    SaveScore(newHs);
+                        GotHighScore = true;
+                    }
                 }
             }
-            else if (ActiveState == GameState.GameOver | ActiveState == GameState.Start)
+            if (ActiveState == GameState.GameOver | ActiveState == GameState.Start)
             {
                 mouseState = Mouse.GetState();
                 //Om spelet inte är aktiverat
-                if (ks.IsKeyDown(Keys.Enter))
+                if (ks.IsKeyDown(Keys.Enter)&&whaitForText==false)
                 {
-                    GotHighScore = false;
-                    Life = 3; Points = 0;
-                    bombs.Clear();
-                    shots.Clear();
-                    fighter.Restore();
-                    ActiveState = GameState.InGame;
+                    restoreGame();
                     //Vi behöver ju även göra en reset på alla bomber och var fightern är när vi startar om
                 }
-                if(ActiveState == GameState.GameOver)
+                if(GotHighScore && whaitForText==false)
                 {
-                    var isClicked = mouseState.LeftButton == ButtonState.Pressed;
-                    CheckClickOnMyBox(mouseState.Position, isClicked, TextBoxRectangle);
+                    whaitForText = true;
+                    RegisterFocusedButtonForTextInput(OnInput);
+                }
+                else if (whaitForText == true)
+                {
+                    if(ks.IsKeyDown(Keys.Enter))
+                    {
+                        UnRegisterFocusedButtonForTextInput(OnInput);
+                        whaitForText = false;
+                        HighScore newHs = new HighScore()
+                        {
+                            Score = Points,
+                            Nickname = playerName.ToString(),
+                            TimePlayed = DateTime.Now
+                        };
+                        SaveScore(newHs);
+                        restoreGame();
+                    }
+                    
                 }
 
             }
@@ -324,7 +336,7 @@ namespace BirdBomber
                 
                 if (GotHighScore)
                 {
-                    spriteBatch.DrawString(Font, "GRATULATION TO HIGHSCORE", new Vector2(GraphicsDevice.Viewport.Bounds.Width/3, 150), Color.White);
+                      spriteBatch.DrawString(Font, "GRATULATION TO HIGHSCORE", new Vector2(GraphicsDevice.Viewport.Bounds.Width/3, 150), Color.White);
                     spriteBatch.Draw(TextBox, TextBoxRectangle, Color.White);
                     spriteBatch.DrawString(Font, ""+playerName.ToString(), new Vector2((float)TextBoxRectangle.Left+40,(float)TextBoxRectangle.Top+40),Color.Black);
                 }
@@ -373,17 +385,9 @@ namespace BirdBomber
         private void SaveScore(HighScore newScore)
         {
             //Vi lägger till scoren
-            int minScore = 0;
-            int maxScore = 0;
-             if (HighScores.Count > 0)
-            {
-                minScore = HighScores.Min(x => x.Score);
-                maxScore = HighScores.Max(x => x.Score);
-            }
-            if (newScore.Score > maxScore)
-            {
-                GotHighScore = true;
-            }
+            
+
+            
             //om scoren är högre än lägsta i listan eller att det inte finns 5st.
             if(newScore.Score> minScore | HighScores.Count<5)
             {
@@ -431,6 +435,17 @@ namespace BirdBomber
                 
             }
 
+        }
+        void restoreGame()
+        {
+            GotHighScore = false;
+            Life = 3; Points = 0;
+            bombs.Clear();
+            shots.Clear();
+            fighter.Restore();
+            ActiveState = GameState.InGame;
+            whaitForText = false;
+            playerName = new StringBuilder();
         }
     }
 }
